@@ -19,6 +19,7 @@ const HAND = ['Rock', 'Paper', 'Scissors'];
 const OUTCOME = ['Bob wins', 'Draw', 'Alice wins'];
 
 const Player = (who) => ({
+ ...stdlib.hasRandom,
  getHand: () => {
   const hand = Math.floor(Math.random() * 3);
   console.log(`${who} played ${HAND[hand]}`);
@@ -26,7 +27,10 @@ const Player = (who) => ({
  }, 
  seeOutcome: (outcome) => {
   console.log(`${who} saw outcome ${OUTCOME[outcome]}`);
- }
+ },
+ informTimeout: () => {
+  console.log(`${who} saw timeout!`);
+ },
 })
 
 await Promise.all([
@@ -34,12 +38,20 @@ await Promise.all([
   // interact objects
   ...Player('Alice'),
   wager: stdlib.parseCurrency(10),
+  deadline: 10,
  }),
  ctcBob.p.Bob({
   // interact objects 
   ...Player('Bob'),
-  acceptWager: (amt) => {
-   console.log(`Bob accepts the wager of ${fmt(amt)}`);
+  acceptWager: async (amt) => {
+   if (Math.random() <= 0.5) {
+    for (let i = 0; i < 10; i++) {
+     console.log(`Bob takes his sweet time...`);
+     await stdlib.wait(1);
+    }
+   } else {
+    console.log(`Bob accepts the wager of ${fmt(amt)}`);
+   }
   },
  })
 ]);
