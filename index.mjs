@@ -1,56 +1,117 @@
-import { loadStdlib } from '@reach-sh/stdlib';
+import { loadStdlib, ask } from '@reach-sh/stdlib';
 import * as backend from './build/index.main.mjs';
 const stdlib = loadStdlib();
 
-const startingBalance = stdlib.parseCurrency(100);
+const isAlice = await ask.ask(
+  'Are you Alice?',
+  ask.yesno
+);
+
+const who = isAlice ? 'Alice' : 'Bob';
+
+console.log(`Starting RPS! as ${who}`);
+
+let acc = null;
+
+const createAcc = await ask.ask(
+  `Would you like to create an account? (Only possible on devnet)`,
+  ask.yesno 
+);
+
+if (createAcc) {
+  acc = await stdlib.newTestAccount(stdlib.parseCurrency(1000));
+} else {
+  const secrete = await ask.ask(
+    `Please input your secrete`,
+    (x => x)
+  );
+  await stdlib.newAccountFromSecrete(secrete);
+}
+
+let ctc = null;
+
+if (isAlice) {
+  ctc = acc.contract(backend);
+  ctc.getInfo().then((info) => {
+    console.log(`The contract is deployed as: ${JSON.stringify(info)}`);
+  });
+} else {
+  const info = await ask.ask(
+    `Please paste the contract info:`,
+    JSON.parse
+  );
+  ctc = acc.contract(backend, info)
+}
+
 const fmt = (x) => stdlib.formatCurrency(x, 4);
-const getBalance = async (who) => fmt(await stdlib.balanceOf(who));
-const accAlice = await stdlib.newTestAccount(startingBalance);
-const accBob = await stdlib.newTestAccount(startingBalance);
+const getBalance = async () => fmt(await stdlib.balanceOf(acc));
 
-const beforeAlice = await getBalance(accAlice);
-const beforeBob = await getBalance(accBob);
+const before = await getBalance();
+console.log(`Your balance is: ${before}`);
 
+const interact = {...stdlib.hasRandom}
 
-const ctcAlice = accAlice.contract(backend);
-const ctcBob = accBob.contract(backend, ctcAlice.getInfo());
+interact.informTimeout = () => {
+  console.log(`There was a timeout`);
+  process.exit(); 
+};
+
+if (isAlice) {
+  const amt = await ask.ask(
+    `How much do you want to wager?`,
+    stdlib.parseCurrency
+  );
+  interact.wager = amt;
+  interact.deadline = {
+    ETH: 100,
+    ALGO: 100,
+    CONFLUX: 1000,
+  }[stdlib.connector]
+} else {
+  interact.acceptWager = async (amt) => {
+    const accepted = await ask.ask(
+      `Do you accept the wager of ${amt}`,
+      ask.yesno
+    );
+    if (!accepted) {
+      process.exit(0);
+    }
+  }
+}
 
 const HAND = ['Rock', 'Paper', 'Scissors'];
-const OUTCOME = ['Bob wins', 'Draw', 'Alice wins'];
+const HANDS = {
+  'Rock': 0, 'ROCK': 0, 'rock': 0, 'R': 0, 'r': 0,
+  'Paper': 1, 'PAPER': 1, 'paper': 1, 'P': 1, 'p': 1,
+  'Scissors': 2, 'SCISSORS': 2, 'scissors': 2, 'S': 2, 's': 2,
+};
 
-const Player = (who) => ({
- ...stdlib.hasRandom,
- getHand: () => {
-  const hand = Math.floor(Math.random() * 3);
-  console.log(`${who} played ${HAND[hand]}`);
+interact.getHand = async () => {
+  const hand = await ask.ask(
+    `What hand do you want to play? Please choose either Rock, Paper or Scissors,`,
+    (x) => {
+      const result = HANDS[x];
+      if (result === undefined) {
+        throw Error(`Not a valid hand: ${result}, Please choose either Rock, Paper or Scissors`);
+      }
+      return result;
+    }
+  );
+  console.log(`You played ${HAND[hand]}`);
   return hand
- }, 
- seeOutcome: (outcome) => {
-  console.log(`${who} saw outcome ${OUTCOME[outcome]}`);
- },
- informTimeout: () => {
-  console.log(`${who} saw timeout!`);
- },
-})
+}
 
-await Promise.all([
- ctcAlice.p.Alice({
-  // interact objects
-  ...Player('Alice'),
-  wager: stdlib.parseCurrency(10),
-  deadline: 10,
- }),
- ctcBob.p.Bob({
-  // interact objects 
-  ...Player('Bob'),
-  acceptWager: async (amt) => {
-    console.log(`Bob accepts the wager of ${fmt(amt)}`);
-   },
- })
-]);
+const OUTCOME = ['Bob wins', 'Draw', 'Alice wins'];
+interact.seeOutcome = async (outcome) => {
+  console.log(`The outcome is: ${[OUTCOME[outcome]]}`);
+};
 
-const afterAlice = await getBalance(accAlice);
-const afterBob = await getBalance(accBob); 
+const part = isAlice ? ctc.p.Alice : ctc.p.Bob;
+await part(interact);
 
-console.log(`Alice went from ${beforeAlice} to ${afterAlice}`);
-console.log(`Bob went from ${beforeBob} to ${afterBob}`);
+const after = await getBalance();
+
+console.log(`Your balance is now ${after}`);
+
+ask.done();
+
