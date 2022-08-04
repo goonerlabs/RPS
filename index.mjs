@@ -21,11 +21,11 @@ const createAcc = await ask.ask(
 if (createAcc) {
   acc = await stdlib.newTestAccount(stdlib.parseCurrency(1000));
 } else {
-  const secrete = await ask.ask(
-    `Please input your secrete`,
+  const seedPhrase = await ask.ask(
+    `Please input your seed phrase`,
     (x => x)
   );
-  await stdlib.newAccountFromSecrete(secrete);
+  await stdlib.newAccountFromMnemonic(seedPhrase);
 }
 
 let ctc = null;
