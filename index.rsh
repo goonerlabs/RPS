@@ -98,5 +98,4 @@ export const main = Reach.App(() => {
   interact.seeOutcome(outcome)
  })
  exit();
-
 });
