@@ -53,7 +53,7 @@ const interact = {...stdlib.hasRandom}
 
 interact.informTimeout = () => {
   console.log(`There was a timeout`);
-  process.exit(); 
+  process.exit(1); 
 };
 
 if (isAlice) {
@@ -70,7 +70,7 @@ if (isAlice) {
 } else {
   interact.acceptWager = async (amt) => {
     const accepted = await ask.ask(
-      `Do you accept the wager of ${amt}`,
+      `Do you accept the wager of ${fmt(amt)}`,
       ask.yesno
     );
     if (!accepted) {
